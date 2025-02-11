@@ -11,3 +11,8 @@ bin-int/
 
 # Exclude
 !vendor/bin
+
+Makefile
+logs
+imgui.ini
+

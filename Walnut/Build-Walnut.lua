@@ -44,6 +44,15 @@ project "Walnut"
       defines { "WL_PLATFORM_WINDOWS" }
       buildoptions { "/utf-8" }
 
+   filter "system:macosx"
+      libdirs { "%{LibraryDir.VulkanSDK}" }
+      links {
+         "Cocoa.framework", 
+         "IOKit.framework", 
+         "CoreFoundation.framework", 
+         "CoreVideo.framework"
+      }
+
    filter "configurations:Debug"
       defines { "WL_DEBUG" }
       runtime "Debug"

@@ -1,8 +1,9 @@
 -- premake5.lua
 workspace "WalnutApp"
-   architecture "x64"
+   architecture "universal"
    configurations { "Debug", "Release", "Dist" }
    startproject "WalnutApp"
+   cppdialect "C++23"
 
    -- Workspace-wide build options for MSVC
    filter "system:windows"

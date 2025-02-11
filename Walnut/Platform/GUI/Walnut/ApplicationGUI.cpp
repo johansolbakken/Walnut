@@ -106,11 +106,18 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count)
 		create_info.ppEnabledLayerNames = layers;
 
 		// Enable debug report extension (we need additional storage, so we duplicate the user array to add our new extension to it)
-		const char** extensions_ext = (const char**)malloc(sizeof(const char*) * (extensions_count + 1));
-		memcpy(extensions_ext, extensions, extensions_count * sizeof(const char*));
-		extensions_ext[extensions_count] = "VK_EXT_debug_report";
-		create_info.enabledExtensionCount = extensions_count + 1;
-		create_info.ppEnabledExtensionNames = extensions_ext;
+		std::vector<const char*> extensions_ext(extensions, extensions + extensions_count);
+        extensions_ext.push_back("VK_EXT_debug_report");
+
+#  ifdef __APPLE__
+        // On macOS, you typically also need these for MoltenVK portability:
+        create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        extensions_ext.push_back("VK_KHR_get_physical_device_properties2");
+        extensions_ext.push_back("VK_KHR_portability_enumeration");
+#  endif		
+
+		create_info.enabledExtensionCount = (uint32_t)extensions_ext.size();
+        create_info.ppEnabledExtensionNames = extensions_ext.data();
 
 		// Create Vulkan Instance
 		err = vkCreateInstance(&create_info, g_Allocator, &g_Instance);
@@ -130,6 +137,17 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count)
 		err = vkCreateDebugReportCallbackEXT(g_Instance, &debug_report_ci, g_Allocator, &g_DebugReport);
 		check_vk_result(err);
 #else
+#  ifdef __APPLE__
+		// On macOS, you typically also need these for MoltenVK portability:
+		create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+		std::vector<const char*> extensions_ext(extensions, extensions + extensions_count);
+		extensions_ext.push_back("VK_KHR_get_physical_device_properties2");
+		extensions_ext.push_back("VK_KHR_portability_enumeration");
+
+		create_info.enabledExtensionCount = (uint32_t)extensions_ext.size();
+		create_info.ppEnabledExtensionNames = extensions_ext.data();
+#  endif
+
 		// Create Vulkan Instance without any debug feature
 		err = vkCreateInstance(&create_info, g_Allocator, &g_Instance);
 		check_vk_result(err);
@@ -187,6 +205,16 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count)
 	{
 		int device_extension_count = 1;
 		const char* device_extensions[] = { "VK_KHR_swapchain" };
+#ifdef __APPLE__
+        // On macOS + MoltenVK, you often need "VK_KHR_portability_subset" device extension
+        // if the driver advertises it. Checking is recommended but for brevity:
+        device_extension_count = 2;
+        const char* device_extensions_apple[] = {
+            "VK_KHR_swapchain",
+            "VK_KHR_portability_subset" // If MoltenVK exposes it
+        };
+#endif
+
 		const float queue_priority[] = { 1.0f };
 		VkDeviceQueueCreateInfo queue_info[1] = {};
 		queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -197,9 +225,14 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count)
 		create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		create_info.queueCreateInfoCount = sizeof(queue_info) / sizeof(queue_info[0]);
 		create_info.pQueueCreateInfos = queue_info;
-		create_info.enabledExtensionCount = device_extension_count;
-		create_info.ppEnabledExtensionNames = device_extensions;
-		err = vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_Device);
+#ifndef __APPLE__
+        create_info.enabledExtensionCount   = device_extension_count;
+        create_info.ppEnabledExtensionNames = device_extensions;
+#else
+        create_info.enabledExtensionCount   = device_extension_count;
+        create_info.ppEnabledExtensionNames = device_extensions_apple;
+#endif		
+	err = vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_Device);
 		check_vk_result(err);
 		vkGetDeviceQueue(g_Device, g_QueueFamily, 0, &g_Queue);
 	}
